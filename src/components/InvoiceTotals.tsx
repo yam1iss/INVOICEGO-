@@ -23,7 +23,10 @@ export function InvoiceTotals({
   const dueValue = showDeposit ? totals.amountDue : totals.total;
 
   return (
-    <div className="ml-auto w-full max-w-none sm:max-w-[20rem]">
+    <div
+      data-invoice-totals
+      className="ml-auto w-full max-w-none sm:max-w-[20rem]"
+    >
       <TotalRow
         label="Subtotal"
         value={formatMoney(totals.subtotal, currency)}

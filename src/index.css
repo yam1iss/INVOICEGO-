@@ -18,10 +18,29 @@
   --color-danger-soft: #f6eeec;
 }
 
-/* Off-screen PDF clone: keep a typical invoice on one A4 page. */
+/* PDF clone: desktop A4 layout even on a phone viewport. */
 [data-pdf-clone] {
-  padding-top: 2.5rem !important;
-  padding-bottom: 1.5rem !important;
+  width: 794px !important;
+  max-width: none !important;
+  padding: 3rem 3rem 1.75rem !important;
+  box-sizing: border-box !important;
+}
+
+[data-pdf-clone] > header {
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+}
+
+[data-pdf-clone] > [data-invoice-title] {
+  flex-direction: row !important;
+  align-items: flex-end !important;
+  justify-content: space-between !important;
+}
+
+[data-pdf-clone] h2 {
+  font-size: 28px !important;
+  letter-spacing: 0.18em !important;
 }
 
 [data-pdf-clone] footer {
@@ -31,6 +50,11 @@
 [data-pdf-clone] tbody td {
   padding-top: 0.55rem !important;
   padding-bottom: 0.55rem !important;
+  font-size: 13px !important;
+}
+
+[data-pdf-clone] [data-invoice-totals] {
+  max-width: 20rem !important;
 }
 
 @layer base {

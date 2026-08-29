@@ -4,7 +4,6 @@ import { jsPDF } from "jspdf";
 const SHEET_WIDTH_PX = 794;
 const SHEET_HEIGHT_PX = Math.round(SHEET_WIDTH_PX * (297 / 210));
 const SHEET_BACKGROUND = "#FFFDF6";
-/** Scale onto one A4 page when overflow is modest (notes/footer should not jump). */
 const FIT_ONE_PAGE_RATIO = 1.45;
 const PAGE_OVERFLOW_MM = 1.5;
 
@@ -14,12 +13,23 @@ export async function downloadInvoicePdf(invoiceNumber: string): Promise<void> {
     throw new Error("Invoice preview not found.");
   }
 
+  const overlay = document.createElement("div");
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.style.cssText = [
+    "position:fixed",
+    "inset:0",
+    "z-index:2147483646",
+    "background:#ececec",
+    "pointer-events:none",
+  ].join(";");
+
   const host = document.createElement("div");
   host.setAttribute("aria-hidden", "true");
   host.style.cssText = [
     "position:fixed",
-    "left:-10000px",
+    "left:0",
     "top:0",
+    "z-index:2147483645",
     `width:${SHEET_WIDTH_PX}px`,
     `background:${SHEET_BACKGROUND}`,
     "pointer-events:none",
@@ -41,12 +51,15 @@ export async function downloadInvoicePdf(invoiceNumber: string): Promise<void> {
 
   host.appendChild(clone);
   document.body.appendChild(host);
+  document.body.appendChild(overlay);
 
   try {
     await waitForImages(clone);
     if (document.fonts?.ready) {
       await document.fonts.ready;
     }
+    await waitTwoFrames();
+    await sleep(50);
 
     const credit = clone.querySelector<HTMLElement>(".mt-auto");
     if (credit) {
@@ -55,7 +68,7 @@ export async function downloadInvoicePdf(invoiceNumber: string): Promise<void> {
     }
 
     void clone.offsetHeight;
-    const contentHeight = Math.ceil(clone.getBoundingClientRect().height);
+    const contentHeight = Math.max(1, Math.ceil(clone.getBoundingClientRect().height));
     const fitsOnePage = contentHeight <= SHEET_HEIGHT_PX;
 
     if (fitsOnePage) {
@@ -70,10 +83,12 @@ export async function downloadInvoicePdf(invoiceNumber: string): Promise<void> {
 
     const captureHeight = fitsOnePage
       ? SHEET_HEIGHT_PX
-      : Math.ceil(clone.getBoundingClientRect().height);
+      : Math.max(1, Math.ceil(clone.getBoundingClientRect().height));
+    const scale = isMobile() ? 1.5 : 2;
+    const useJpeg = isMobile();
 
     const canvas = await html2canvas(clone, {
-      scale: 2,
+      scale,
       useCORS: true,
       backgroundColor: SHEET_BACKGROUND,
       logging: false,
@@ -83,9 +98,18 @@ export async function downloadInvoicePdf(invoiceNumber: string): Promise<void> {
       windowHeight: captureHeight,
       scrollX: 0,
       scrollY: 0,
+      onclone: (doc) => {
+        doc.documentElement.style.width = `${SHEET_WIDTH_PX}px`;
+        doc.body.style.width = `${SHEET_WIDTH_PX}px`;
+        doc.body.style.margin = "0";
+        doc.body.style.background = SHEET_BACKGROUND;
+      },
     });
 
-    const image = canvas.toDataURL("image/png");
+    const image = useJpeg
+      ? canvas.toDataURL("image/jpeg", 0.92)
+      : canvas.toDataURL("image/png");
+    const imageFormat = useJpeg ? "JPEG" : "PNG";
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -105,19 +129,19 @@ export async function downloadInvoicePdf(invoiceNumber: string): Promise<void> {
 
     if (imageHeight <= pageHeight + PAGE_OVERFLOW_MM) {
       fillPage();
-      pdf.addImage(image, "PNG", 0, 0, imageWidth, imageHeight, undefined, "FAST");
+      pdf.addImage(image, imageFormat, 0, 0, imageWidth, imageHeight, undefined, "FAST");
     } else if (imageHeight <= pageHeight * FIT_ONE_PAGE_RATIO) {
-      const scale = pageHeight / imageHeight;
-      const width = imageWidth * scale;
+      const fit = pageHeight / imageHeight;
+      const width = imageWidth * fit;
       const x = (pageWidth - width) / 2;
       fillPage();
-      pdf.addImage(image, "PNG", x, 0, width, pageHeight, undefined, "FAST");
+      pdf.addImage(image, imageFormat, x, 0, width, pageHeight, undefined, "FAST");
     } else {
       let remaining = imageHeight;
       let offset = 0;
 
       fillPage();
-      pdf.addImage(image, "PNG", 0, offset, imageWidth, imageHeight, undefined, "FAST");
+      pdf.addImage(image, imageFormat, 0, offset, imageWidth, imageHeight, undefined, "FAST");
       remaining -= pageHeight;
 
       while (remaining > PAGE_OVERFLOW_MM) {
@@ -126,7 +150,7 @@ export async function downloadInvoicePdf(invoiceNumber: string): Promise<void> {
         fillPage();
         pdf.addImage(
           image,
-          "PNG",
+          imageFormat,
           0,
           offset,
           imageWidth,
@@ -138,8 +162,9 @@ export async function downloadInvoicePdf(invoiceNumber: string): Promise<void> {
       }
     }
 
-    pdf.save(pdfFileName(invoiceNumber));
+    await savePdf(pdf, pdfFileName(invoiceNumber));
   } finally {
+    overlay.remove();
     host.remove();
   }
 }
@@ -152,6 +177,62 @@ export function pdfFileName(invoiceNumber: string): string {
 
   if (!number) return "Invoice.pdf";
   return `Invoice ${number}.pdf`;
+}
+
+async function savePdf(pdf: jsPDF, filename: string): Promise<void> {
+  const blob = pdf.output("blob");
+  const file = new File([blob], filename, { type: "application/pdf" });
+
+  if (isMobile() && canShareFile(file)) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  if (isIOS()) {
+    window.open(url, "_blank");
+  }
+
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+function canShareFile(file: File): boolean {
+  return typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
+}
+
+function isMobile(): boolean {
+  return window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 768;
+}
+
+function isIOS(): boolean {
+  return (
+    /iP(ad|hone|od)/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+function waitTwoFrames(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 function waitForImages(root: HTMLElement): Promise<void> {

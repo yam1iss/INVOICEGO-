@@ -107,7 +107,10 @@ export function InvoicePreview({ invoice }: InvoicePreviewProps) {
           </div>
         </header>
 
-        <div className="mt-8 flex flex-col gap-6 border-t border-line pt-8 sm:flex-row sm:items-end sm:justify-between">
+        <div
+          data-invoice-title
+          className="mt-8 flex flex-col gap-6 border-t border-line pt-8 sm:flex-row sm:items-end sm:justify-between"
+        >
           <h2 className="text-[22px] font-semibold uppercase tracking-[0.14em] text-ink sm:text-[28px] sm:tracking-[0.18em]">
             Invoice
           </h2>
