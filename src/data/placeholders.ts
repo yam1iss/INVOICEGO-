@@ -1,0 +1,15 @@
+export const PLACEHOLDERS = {
+  businessName: "Your business",
+  businessEmail: "hello@email.com",
+  businessPhone: "+60 123 456 789",
+  businessAddress: "123 Jalan Example\nKuala Lumpur, 50000",
+  businessWebsite: "www.website.com",
+  clientName: "Client name",
+  clientEmail: "client@email.com",
+  clientPhone: "+60 123 456 789",
+  clientAddress: "456 Jalan Example\nPetaling Jaya, 47800",
+  invoiceNumber: "INV-0001",
+  itemDescription: "Item or service",
+  notes: "Thank you for your business.",
+  paymentTerms: "Payment due within 14 days of the issue date.",
+} as const;
