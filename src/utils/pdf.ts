@@ -17,6 +17,8 @@ export async function createInvoicePdf(
     throw new Error("Invoice preview not found.");
   }
 
+  // Use a fixed host at origin (0, 0) behind the download overlay so browsers
+  // (both iOS Safari and Android Chrome) calculate exact layouts and font metrics.
   const host = document.createElement("div");
   host.setAttribute("aria-hidden", "true");
   host.style.cssText = [
@@ -55,7 +57,7 @@ export async function createInvoicePdf(
       await document.fonts.ready;
     }
     await waitTwoFrames();
-    await sleep(80);
+    await sleep(60);
 
     const credit = clone.querySelector<HTMLElement>(".mt-auto");
     if (credit) {
@@ -64,7 +66,10 @@ export async function createInvoicePdf(
     }
 
     void clone.offsetHeight;
-    const contentHeight = Math.max(1, Math.ceil(clone.getBoundingClientRect().height));
+    const contentHeight = Math.max(
+      1,
+      Math.ceil(clone.getBoundingClientRect().height),
+    );
     const fitsOnePage = contentHeight <= SHEET_HEIGHT_PX;
 
     if (fitsOnePage) {
@@ -81,8 +86,7 @@ export async function createInvoicePdf(
       ? SHEET_HEIGHT_PX
       : Math.max(1, Math.ceil(clone.getBoundingClientRect().height));
 
-    const scale = isMobile() ? 1.75 : 2;
-    const useJpeg = isMobile();
+    const scale = 2;
 
     const canvas = await html2canvas(clone, {
       scale,
@@ -96,9 +100,11 @@ export async function createInvoicePdf(
       scrollX: 0,
       scrollY: 0,
       onclone: (doc) => {
+        // Enforce exact desktop A4 dimensions on the cloned document
         doc.documentElement.style.width = `${SHEET_WIDTH_PX}px`;
         doc.documentElement.style.minWidth = `${SHEET_WIDTH_PX}px`;
         doc.documentElement.style.maxWidth = `${SHEET_WIDTH_PX}px`;
+        doc.documentElement.style.background = SHEET_BACKGROUND;
         doc.body.style.width = `${SHEET_WIDTH_PX}px`;
         doc.body.style.minWidth = `${SHEET_WIDTH_PX}px`;
         doc.body.style.maxWidth = `${SHEET_WIDTH_PX}px`;
@@ -108,10 +114,7 @@ export async function createInvoicePdf(
       },
     });
 
-    const image = useJpeg
-      ? canvas.toDataURL("image/jpeg", 0.95)
-      : canvas.toDataURL("image/png");
-    const imageFormat = useJpeg ? "JPEG" : "PNG";
+    const image = canvas.toDataURL("image/png");
 
     const pdf = new jsPDF({
       orientation: "portrait",
@@ -132,19 +135,19 @@ export async function createInvoicePdf(
 
     if (imageHeight <= pageHeight + PAGE_OVERFLOW_MM) {
       fillPage();
-      pdf.addImage(image, imageFormat, 0, 0, imageWidth, imageHeight, undefined, "FAST");
+      pdf.addImage(image, "PNG", 0, 0, imageWidth, imageHeight, undefined, "FAST");
     } else if (imageHeight <= pageHeight * FIT_ONE_PAGE_RATIO) {
       const fit = pageHeight / imageHeight;
       const width = imageWidth * fit;
       const x = (pageWidth - width) / 2;
       fillPage();
-      pdf.addImage(image, imageFormat, x, 0, width, pageHeight, undefined, "FAST");
+      pdf.addImage(image, "PNG", x, 0, width, pageHeight, undefined, "FAST");
     } else {
       let remaining = imageHeight;
       let offset = 0;
 
       fillPage();
-      pdf.addImage(image, imageFormat, 0, offset, imageWidth, imageHeight, undefined, "FAST");
+      pdf.addImage(image, "PNG", 0, offset, imageWidth, imageHeight, undefined, "FAST");
       remaining -= pageHeight;
 
       while (remaining > PAGE_OVERFLOW_MM) {
@@ -153,7 +156,7 @@ export async function createInvoicePdf(
         fillPage();
         pdf.addImage(
           image,
-          imageFormat,
+          "PNG",
           0,
           offset,
           imageWidth,
@@ -203,7 +206,7 @@ export function pdfFileName(
 async function savePdf(pdf: jsPDF, filename: string): Promise<void> {
   const blob = pdf.output("blob");
 
-  // 1. Mobile Web Share API (Primary on mobile devices)
+  // 1. Mobile Web Share API (Primary on mobile iOS/Android)
   const file = new File([blob], filename, { type: "application/pdf" });
   if (isMobile() && canShareFile(file)) {
     try {
@@ -224,7 +227,7 @@ async function savePdf(pdf: jsPDF, filename: string): Promise<void> {
   link.click();
   link.remove();
 
-  // 3. iOS Safari Fallback (opens directly in Safari tab if download attr is blocked)
+  // 3. iOS Safari Fallback
   if (isIOS()) {
     window.open(url, "_blank");
   }
@@ -233,11 +236,16 @@ async function savePdf(pdf: jsPDF, filename: string): Promise<void> {
 }
 
 function canShareFile(file: File): boolean {
-  return typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
+  return (
+    typeof navigator.canShare === "function" &&
+    navigator.canShare({ files: [file] })
+  );
 }
 
 function isMobile(): boolean {
-  return window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 768;
+  return (
+    window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 768
+  );
 }
 
 function isIOS(): boolean {

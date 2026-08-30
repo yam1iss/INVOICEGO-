@@ -29,6 +29,15 @@
   background-color: #FFFDF6 !important;
 }
 
+[data-pdf-clone] img {
+  max-width: 14rem !important;
+  max-height: 3.5rem !important;
+  height: auto !important;
+  width: auto !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
 [data-pdf-clone] .moondev-logo {
   font-size: 32px !important;
   line-height: 1 !important;
