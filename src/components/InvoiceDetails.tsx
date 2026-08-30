@@ -1,5 +1,5 @@
 import { CURRENCIES } from "../data/currencies";
-import { DOCUMENT_TYPES, getDocumentConfig, type DocumentType } from "../data/documentTypes";
+import { getDocumentConfig, type DocumentType } from "../data/documentTypes";
 import type { InvoiceDetails as InvoiceDetailsData } from "../types/invoice";
 import { DatePicker } from "./DatePicker";
 import { Dropdown } from "./Dropdown";
@@ -10,31 +10,18 @@ type InvoiceDetailsProps = {
   details: InvoiceDetailsData;
   documentType: DocumentType;
   onChange: (patch: Partial<InvoiceDetailsData>) => void;
-  onDocumentTypeChange: (type: DocumentType) => void;
 };
 
 export function InvoiceDetails({
   details,
   documentType,
   onChange,
-  onDocumentTypeChange,
 }: InvoiceDetailsProps) {
   const docConfig = getDocumentConfig(documentType);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Document type" htmlFor="document-type">
-          <Dropdown
-            id="document-type"
-            value={documentType}
-            options={DOCUMENT_TYPES.map((doc) => ({
-              value: doc.id,
-              label: doc.label,
-            }))}
-            onChange={(value) => onDocumentTypeChange(value as DocumentType)}
-          />
-        </Field>
         <Field label={docConfig.numberLabel} htmlFor="invoice-number">
           <Input
             id="invoice-number"
@@ -43,9 +30,6 @@ export function InvoiceDetails({
             onChange={(event) => onChange({ invoiceNumber: event.target.value })}
           />
         </Field>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Currency" htmlFor="invoice-currency">
           <Dropdown
             id="invoice-currency"
@@ -61,6 +45,9 @@ export function InvoiceDetails({
             }
           />
         </Field>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={docConfig.primaryDateLabel} htmlFor="invoice-issue-date">
           <DatePicker
             id="invoice-issue-date"

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { DownloadLoadingOverlay } from "./components/DownloadLoadingOverlay";
 import { Header } from "./components/Header";
 import { InvoiceEditor } from "./components/InvoiceEditor";
 import { InvoicePreview } from "./components/InvoicePreview";
@@ -18,20 +19,20 @@ export default function App() {
   const canDownload = canDownloadInvoice(invoiceState.invoice);
   const docConfig = getDocumentConfig(invoiceState.invoice.documentType);
 
-  async function handleDownloadPdf() {
+  function handleStartDownload() {
     if (downloading || !canDownload) return;
     setDownloading(true);
-    try {
-      await downloadInvoicePdf(
-        invoiceState.invoice.details.invoiceNumber,
-        invoiceState.invoice.documentType ?? "invoice",
-      );
-    } catch (error) {
-      console.error("Could not download invoice PDF.", error);
-    } finally {
-      setDownloading(false);
-    }
   }
+
+  const handleExecuteDownload = useCallback(async () => {
+    await downloadInvoicePdf(
+      invoiceState.invoice.details.invoiceNumber,
+      invoiceState.invoice.documentType ?? "invoice",
+    );
+  }, [
+    invoiceState.invoice.details.invoiceNumber,
+    invoiceState.invoice.documentType,
+  ]);
 
   return (
     <div
@@ -45,9 +46,8 @@ export default function App() {
       />
       <Header
         documentType={invoiceState.invoice.documentType ?? "invoice"}
-        onDocumentTypeChange={invoiceState.setDocumentType}
         onNew={() => setConfirmNew(true)}
-        onDownloadPdf={handleDownloadPdf}
+        onDownloadPdf={handleStartDownload}
         downloading={downloading}
         canDownload={canDownload}
       />
@@ -80,6 +80,13 @@ export default function App() {
           setConfirmNew(false);
         }}
       />
+      {downloading ? (
+        <DownloadLoadingOverlay
+          documentTitle={docConfig.title}
+          onAnimationComplete={handleExecuteDownload}
+          onDone={() => setDownloading(false)}
+        />
+      ) : null}
     </div>
   );
 }

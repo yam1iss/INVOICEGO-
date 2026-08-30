@@ -8,32 +8,22 @@ const SHEET_BACKGROUND = "#FFFDF6";
 const FIT_ONE_PAGE_RATIO = 1.45;
 const PAGE_OVERFLOW_MM = 1.5;
 
-export async function downloadInvoicePdf(
+export async function createInvoicePdf(
   invoiceNumber: string,
   documentType: DocumentType = "invoice",
-): Promise<void> {
+): Promise<{ save: () => Promise<void>; filename: string }> {
   const source = document.querySelector<HTMLElement>("[data-invoice-sheet]");
   if (!source) {
     throw new Error("Invoice preview not found.");
   }
 
-  const overlay = document.createElement("div");
-  overlay.setAttribute("aria-hidden", "true");
-  overlay.style.cssText = [
-    "position:fixed",
-    "inset:0",
-    "z-index:2147483646",
-    "background:#ececec",
-    "pointer-events:none",
-  ].join(";");
-
   const host = document.createElement("div");
   host.setAttribute("aria-hidden", "true");
   host.style.cssText = [
     "position:fixed",
-    "left:0",
+    "left:-9999px",
     "top:0",
-    "z-index:2147483645",
+    "z-index:-10",
     `width:${SHEET_WIDTH_PX}px`,
     `background:${SHEET_BACKGROUND}`,
     "pointer-events:none",
@@ -55,7 +45,6 @@ export async function downloadInvoicePdf(
 
   host.appendChild(clone);
   document.body.appendChild(host);
-  document.body.appendChild(overlay);
 
   try {
     await waitForImages(clone);
@@ -166,11 +155,24 @@ export async function downloadInvoicePdf(
       }
     }
 
-    await savePdf(pdf, pdfFileName(invoiceNumber, documentType));
+    const filename = pdfFileName(invoiceNumber, documentType);
+    return {
+      filename,
+      save: async () => {
+        await savePdf(pdf, filename);
+      },
+    };
   } finally {
-    overlay.remove();
     host.remove();
   }
+}
+
+export async function downloadInvoicePdf(
+  invoiceNumber: string,
+  documentType: DocumentType = "invoice",
+): Promise<void> {
+  const prepared = await createInvoicePdf(invoiceNumber, documentType);
+  await prepared.save();
 }
 
 export function pdfFileName(
