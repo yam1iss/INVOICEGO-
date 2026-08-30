@@ -21,10 +21,12 @@
 /* PDF clone: desktop A4 layout even on a phone viewport. */
 [data-pdf-clone] {
   width: 794px !important;
-  max-width: none !important;
+  min-width: 794px !important;
+  max-width: 794px !important;
   padding: 3rem 3rem 1.75rem !important;
   box-sizing: border-box !important;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif !important;
+  background-color: #FFFDF6 !important;
 }
 
 [data-pdf-clone] .moondev-logo {
@@ -44,6 +46,8 @@
   flex-direction: row !important;
   align-items: flex-end !important;
   justify-content: space-between !important;
+  margin-top: 2rem !important;
+  padding-top: 2rem !important;
 }
 
 [data-pdf-clone] h2 {
@@ -51,8 +55,18 @@
   letter-spacing: 0.18em !important;
 }
 
-[data-pdf-clone] footer {
-  margin-top: 2rem !important;
+[data-pdf-clone] dl {
+  display: grid !important;
+  grid-template-columns: auto auto !important;
+  column-gap: 1.5rem !important;
+  row-gap: 0.375rem !important;
+  font-size: 12px !important;
+}
+
+[data-pdf-clone] table {
+  width: 100% !important;
+  table-layout: fixed !important;
+  margin-top: 2.5rem !important;
 }
 
 [data-pdf-clone] tbody td {
@@ -63,6 +77,11 @@
 
 [data-pdf-clone] [data-invoice-totals] {
   max-width: 20rem !important;
+  margin-left: auto !important;
+}
+
+[data-pdf-clone] footer {
+  margin-top: 2rem !important;
 }
 
 @layer base {

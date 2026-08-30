@@ -8,30 +8,6 @@ const SHEET_BACKGROUND = "#FFFDF6";
 const FIT_ONE_PAGE_RATIO = 1.45;
 const PAGE_OVERFLOW_MM = 1.5;
 
-function getDocumentCss(): string {
-  const cssChunks: string[] = [];
-
-  for (const sheet of Array.from(document.styleSheets)) {
-    try {
-      if (sheet.cssRules) {
-        for (const rule of Array.from(sheet.cssRules)) {
-          cssChunks.push(rule.cssText);
-        }
-      }
-    } catch {
-      // Ignore cross-origin security errors
-    }
-  }
-
-  document.querySelectorAll("style").forEach((styleEl) => {
-    if (styleEl.textContent) {
-      cssChunks.push(styleEl.textContent);
-    }
-  });
-
-  return cssChunks.join("\n");
-}
-
 export async function createInvoicePdf(
   invoiceNumber: string,
   documentType: DocumentType = "invoice",
@@ -49,6 +25,8 @@ export async function createInvoicePdf(
     "top:0",
     "z-index:9000",
     `width:${SHEET_WIDTH_PX}px`,
+    `min-width:${SHEET_WIDTH_PX}px`,
+    `max-width:${SHEET_WIDTH_PX}px`,
     `background:${SHEET_BACKGROUND}`,
     "pointer-events:none",
   ].join(";");
@@ -56,7 +34,8 @@ export async function createInvoicePdf(
   const clone = source.cloneNode(true) as HTMLElement;
   clone.setAttribute("data-pdf-clone", "");
   clone.style.width = `${SHEET_WIDTH_PX}px`;
-  clone.style.maxWidth = "none";
+  clone.style.minWidth = `${SHEET_WIDTH_PX}px`;
+  clone.style.maxWidth = `${SHEET_WIDTH_PX}px`;
   clone.style.border = "none";
   clone.style.boxShadow = "none";
   clone.style.display = "flex";
@@ -76,7 +55,7 @@ export async function createInvoicePdf(
       await document.fonts.ready;
     }
     await waitTwoFrames();
-    await sleep(60);
+    await sleep(80);
 
     const credit = clone.querySelector<HTMLElement>(".mt-auto");
     if (credit) {
@@ -102,13 +81,12 @@ export async function createInvoicePdf(
       ? SHEET_HEIGHT_PX
       : Math.max(1, Math.ceil(clone.getBoundingClientRect().height));
 
-    const scale = 2;
-    const allCss = getDocumentCss();
+    const scale = isMobile() ? 1.75 : 2;
+    const useJpeg = isMobile();
 
     const canvas = await html2canvas(clone, {
       scale,
       useCORS: true,
-      allowTaint: true,
       backgroundColor: SHEET_BACKGROUND,
       logging: false,
       width: SHEET_WIDTH_PX,
@@ -118,32 +96,23 @@ export async function createInvoicePdf(
       scrollX: 0,
       scrollY: 0,
       onclone: (doc) => {
-        const base = doc.createElement("base");
-        base.href = window.location.origin;
-        doc.head.appendChild(base);
-
-        if (allCss) {
-          const styleEl = doc.createElement("style");
-          styleEl.setAttribute("type", "text/css");
-          styleEl.textContent = allCss;
-          doc.head.appendChild(styleEl);
-        }
-
-        doc.querySelectorAll("link[rel='stylesheet']").forEach((link) => {
-          const href = link.getAttribute("href");
-          if (href && !href.startsWith("http://") && !href.startsWith("https://") && !href.startsWith("//")) {
-            link.setAttribute("href", new URL(href, window.location.href).href);
-          }
-        });
-
         doc.documentElement.style.width = `${SHEET_WIDTH_PX}px`;
+        doc.documentElement.style.minWidth = `${SHEET_WIDTH_PX}px`;
+        doc.documentElement.style.maxWidth = `${SHEET_WIDTH_PX}px`;
         doc.body.style.width = `${SHEET_WIDTH_PX}px`;
+        doc.body.style.minWidth = `${SHEET_WIDTH_PX}px`;
+        doc.body.style.maxWidth = `${SHEET_WIDTH_PX}px`;
         doc.body.style.margin = "0";
+        doc.body.style.padding = "0";
         doc.body.style.background = SHEET_BACKGROUND;
       },
     });
 
-    const image = canvas.toDataURL("image/png");
+    const image = useJpeg
+      ? canvas.toDataURL("image/jpeg", 0.95)
+      : canvas.toDataURL("image/png");
+    const imageFormat = useJpeg ? "JPEG" : "PNG";
+
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -163,19 +132,19 @@ export async function createInvoicePdf(
 
     if (imageHeight <= pageHeight + PAGE_OVERFLOW_MM) {
       fillPage();
-      pdf.addImage(image, "PNG", 0, 0, imageWidth, imageHeight, undefined, "FAST");
+      pdf.addImage(image, imageFormat, 0, 0, imageWidth, imageHeight, undefined, "FAST");
     } else if (imageHeight <= pageHeight * FIT_ONE_PAGE_RATIO) {
       const fit = pageHeight / imageHeight;
       const width = imageWidth * fit;
       const x = (pageWidth - width) / 2;
       fillPage();
-      pdf.addImage(image, "PNG", x, 0, width, pageHeight, undefined, "FAST");
+      pdf.addImage(image, imageFormat, x, 0, width, pageHeight, undefined, "FAST");
     } else {
       let remaining = imageHeight;
       let offset = 0;
 
       fillPage();
-      pdf.addImage(image, "PNG", 0, offset, imageWidth, imageHeight, undefined, "FAST");
+      pdf.addImage(image, imageFormat, 0, offset, imageWidth, imageHeight, undefined, "FAST");
       remaining -= pageHeight;
 
       while (remaining > PAGE_OVERFLOW_MM) {
@@ -184,7 +153,7 @@ export async function createInvoicePdf(
         fillPage();
         pdf.addImage(
           image,
-          "PNG",
+          imageFormat,
           0,
           offset,
           imageWidth,
@@ -233,8 +202,9 @@ export function pdfFileName(
 
 async function savePdf(pdf: jsPDF, filename: string): Promise<void> {
   const blob = pdf.output("blob");
-  const file = new File([blob], filename, { type: "application/pdf" });
 
+  // 1. Mobile Web Share API (Primary on mobile devices)
+  const file = new File([blob], filename, { type: "application/pdf" });
   if (isMobile() && canShareFile(file)) {
     try {
       await navigator.share({ files: [file], title: filename });
@@ -244,6 +214,7 @@ async function savePdf(pdf: jsPDF, filename: string): Promise<void> {
     }
   }
 
+  // 2. Standard Blob Link Trigger
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -253,11 +224,12 @@ async function savePdf(pdf: jsPDF, filename: string): Promise<void> {
   link.click();
   link.remove();
 
+  // 3. iOS Safari Fallback (opens directly in Safari tab if download attr is blocked)
   if (isIOS()) {
     window.open(url, "_blank");
   }
 
-  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function canShareFile(file: File): boolean {
