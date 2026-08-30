@@ -21,9 +21,9 @@ export async function createInvoicePdf(
   host.setAttribute("aria-hidden", "true");
   host.style.cssText = [
     "position:fixed",
-    "left:-9999px",
+    "left:0",
     "top:0",
-    "z-index:-10",
+    "z-index:9000",
     `width:${SHEET_WIDTH_PX}px`,
     `background:${SHEET_BACKGROUND}`,
     "pointer-events:none",

@@ -24,15 +24,23 @@
   max-width: none !important;
   padding: 3rem 3rem 1.75rem !important;
   box-sizing: border-box !important;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif !important;
+}
+
+[data-pdf-clone] .moondev-logo {
+  font-size: 32px !important;
+  line-height: 1 !important;
 }
 
 [data-pdf-clone] > header {
+  display: flex !important;
   flex-direction: row !important;
   align-items: flex-start !important;
   justify-content: space-between !important;
 }
 
 [data-pdf-clone] > [data-invoice-title] {
+  display: flex !important;
   flex-direction: row !important;
   align-items: flex-end !important;
   justify-content: space-between !important;
