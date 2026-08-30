@@ -1,8 +1,10 @@
+import type { DocumentType } from "../data/documentTypes";
 import type { CurrencyCode } from "../types/invoice";
 import type { InvoiceTotals as Totals } from "../utils/calculations";
 import { formatMoney, formatPercent } from "../utils/format";
 
 type InvoiceTotalsProps = {
+  documentType?: DocumentType;
   totals: Totals;
   taxRate: number;
   currency: CurrencyCode;
@@ -11,6 +13,7 @@ type InvoiceTotalsProps = {
 };
 
 export function InvoiceTotals({
+  documentType,
   totals,
   taxRate,
   currency,
@@ -19,7 +22,12 @@ export function InvoiceTotals({
 }: InvoiceTotalsProps) {
   const taxLabel =
     taxRate > 0 ? `Tax (${formatPercent(taxRate)})` : "Tax";
-  const dueLabel = showDeposit ? "Amount due" : "Total";
+  const dueLabel =
+    showDeposit && documentType !== "quotation"
+      ? "Amount due"
+      : documentType === "quotation"
+        ? "Quotation total"
+        : "Total";
   const dueValue = showDeposit ? totals.amountDue : totals.total;
 
   return (

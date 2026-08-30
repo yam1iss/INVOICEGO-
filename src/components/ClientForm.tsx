@@ -1,3 +1,4 @@
+import type { DocumentType } from "../data/documentTypes";
 import { PLACEHOLDERS } from "../data/placeholders";
 import type { ClientInfo } from "../types/invoice";
 import { Field } from "./Field";
@@ -5,14 +6,20 @@ import { Input } from "./Input";
 import { Textarea } from "./Textarea";
 
 type ClientFormProps = {
+  documentType?: DocumentType;
   client: ClientInfo;
   onChange: (patch: Partial<ClientInfo>) => void;
 };
 
-export function ClientForm({ client, onChange }: ClientFormProps) {
+export function ClientForm({ documentType, client, onChange }: ClientFormProps) {
+  const nameLabel =
+    documentType === "delivery_order"
+      ? "Recipient name / Company"
+      : "Client name";
+
   return (
     <div className="flex flex-col gap-4">
-      <Field label="Client name" htmlFor="client-name">
+      <Field label={nameLabel} htmlFor="client-name">
         <Input
           id="client-name"
           value={client.name}

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { getDocumentConfig } from "../data/documentTypes";
 import type { InvoiceController } from "../hooks/useInvoice";
 import { BusinessForm } from "./BusinessForm";
 import { ClientForm } from "./ClientForm";
@@ -13,6 +14,7 @@ type InvoiceEditorProps = {
 
 export function InvoiceEditor({ state }: InvoiceEditorProps) {
   const { invoice } = state;
+  const docConfig = getDocumentConfig(invoice.documentType);
 
   return (
     <aside
@@ -30,16 +32,19 @@ export function InvoiceEditor({ state }: InvoiceEditorProps) {
             onLineThemeChange={state.setLineTheme}
           />
         </EditorSection>
-        <EditorSection title="Client">
+        <EditorSection title={docConfig.recipientLabel}>
           <ClientForm
+            documentType={invoice.documentType}
             client={invoice.client}
             onChange={state.updateClient}
           />
         </EditorSection>
-        <EditorSection title="Invoice details">
+        <EditorSection title="Document details">
           <InvoiceDetails
             details={invoice.details}
+            documentType={invoice.documentType ?? "invoice"}
             onChange={state.updateDetails}
+            onDocumentTypeChange={state.setDocumentType}
           />
         </EditorSection>
         <EditorSection title="Items">
@@ -53,8 +58,17 @@ export function InvoiceEditor({ state }: InvoiceEditorProps) {
             onItemFocused={state.clearItemFocus}
           />
         </EditorSection>
-        <EditorSection title="Deposit & Payment">
+        <EditorSection
+          title={
+            invoice.documentType === "quotation"
+              ? "Taxes & Discounts"
+              : invoice.documentType === "delivery_order"
+                ? "Taxes & Adjustments"
+                : "Deposit & Payment"
+          }
+        >
           <DepositPayment
+            documentType={invoice.documentType}
             taxRate={invoice.taxRate}
             discount={invoice.discount}
             deposit={invoice.deposit ?? 0}
@@ -64,8 +78,9 @@ export function InvoiceEditor({ state }: InvoiceEditorProps) {
             onDepositChange={state.setDeposit}
           />
         </EditorSection>
-        <EditorSection title=" Additional Notes">
+        <EditorSection title="Additional notes & terms">
           <NotesForm
+            documentType={invoice.documentType}
             notes={invoice.notes}
             paymentTerms={invoice.paymentTerms}
             onNotesChange={state.setNotes}

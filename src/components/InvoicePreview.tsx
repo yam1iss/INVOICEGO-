@@ -1,3 +1,4 @@
+import { getDocumentConfig } from "../data/documentTypes";
 import { isMoondevWordmark } from "../data/logo";
 import { PLACEHOLDERS } from "../data/placeholders";
 import type { Invoice } from "../types/invoice";
@@ -19,6 +20,7 @@ type InvoicePreviewProps = {
 
 export function InvoicePreview({ invoice }: InvoicePreviewProps) {
   const { business, client, details, items } = invoice;
+  const docConfig = getDocumentConfig(invoice.documentType);
   const totals = computeTotals(
     items,
     invoice.discount,
@@ -109,25 +111,25 @@ export function InvoicePreview({ invoice }: InvoicePreviewProps) {
 
         <div
           data-invoice-title
-          className="mt-8 flex flex-col gap-6 border-t border-line pt-8 sm:flex-row sm:items-end sm:justify-between"
+          className="mt-6 flex flex-row items-end justify-between gap-3 border-t border-line pt-6 sm:mt-8 sm:gap-6 sm:pt-8"
         >
-          <h2 className="text-[22px] font-semibold uppercase tracking-[0.14em] text-ink sm:text-[28px] sm:tracking-[0.18em]">
-            Invoice
+          <h2 className="text-[17px] font-semibold uppercase tracking-[0.1em] text-ink min-[380px]:text-[20px] min-[440px]:text-[22px] sm:text-[28px] sm:tracking-[0.18em]">
+            {docConfig.title}
           </h2>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-[12px] sm:grid-cols-[auto_auto]">
+          <dl className="grid shrink-0 grid-cols-[auto_auto] gap-x-2.5 gap-y-1 text-[11px] sm:gap-x-6 sm:gap-y-1.5 sm:text-[12px]">
             <Meta
-              label="Invoice number"
+              label={docConfig.numberLabel}
               value={details.invoiceNumber}
-              placeholder={PLACEHOLDERS.invoiceNumber}
+              placeholder={docConfig.defaultNumber}
             />
-            <Meta label="Issue date" value={formatDate(details.issueDate)} />
-            <Meta label="Due date" value={formatDate(details.dueDate)} />
+            <Meta label={docConfig.primaryDateLabel} value={formatDate(details.issueDate)} />
+            <Meta label={docConfig.secondaryDateLabel} value={formatDate(details.dueDate)} />
           </dl>
         </div>
 
         <section className="mt-10">
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
-            Bill to
+            {docConfig.recipientLabel}
           </h3>
           <p className="mt-2 text-[13px] font-semibold">
             <PreviewText
@@ -223,6 +225,7 @@ export function InvoicePreview({ invoice }: InvoicePreviewProps) {
 
         <div className="mt-8 flex justify-end print:break-inside-avoid">
           <InvoiceTotals
+            documentType={invoice.documentType}
             totals={totals}
             taxRate={invoice.taxRate}
             currency={details.currency}
@@ -231,26 +234,45 @@ export function InvoicePreview({ invoice }: InvoicePreviewProps) {
           />
         </div>
 
-        <footer className="mt-12 space-y-5 border-t border-line pt-6">
+        <footer className="mt-12 space-y-6 border-t border-line pt-6">
           <div>
             <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
               Notes
             </h3>
             <p className="mt-2 whitespace-pre-line text-[12px] leading-relaxed">
-              <PreviewText value={notes} placeholder={PLACEHOLDERS.notes} />
+              <PreviewText value={notes} placeholder={docConfig.notesPlaceholder} />
             </p>
           </div>
-          <div>
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
-              Payment terms
-            </h3>
-            <p className="mt-2 whitespace-pre-line text-[12px] leading-relaxed">
-              <PreviewText
-                value={terms}
-                placeholder={PLACEHOLDERS.paymentTerms}
-              />
-            </p>
-          </div>
+
+          {invoice.documentType === "delivery_order" ? (
+            <div className="pt-2">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+                Acknowledgement
+              </h3>
+              <div className="mt-8 flex items-end justify-between gap-8 text-[12px]">
+                <div className="w-56 max-w-[55%]">
+                  <div className="mb-1.5 h-6 border-b border-ink/40" />
+                  <p className="text-[11px] text-ink-muted">Received by / Signature & Chop</p>
+                </div>
+                <div className="w-36 text-right sm:w-44">
+                  <div className="mb-1.5 h-6 border-b border-ink/40" />
+                  <p className="text-[11px] text-ink-muted">Date</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+                {docConfig.termsLabel}
+              </h3>
+              <p className="mt-2 whitespace-pre-line text-[12px] leading-relaxed">
+                <PreviewText
+                  value={terms}
+                  placeholder={docConfig.termsPlaceholder}
+                />
+              </p>
+            </div>
+          )}
         </footer>
 
         <p className="mt-auto flex items-center justify-end gap-1.5 pt-6 text-[10px] text-ink-muted">
@@ -294,7 +316,7 @@ function Meta({
     <>
       <dt className="text-ink-muted">{label}</dt>
       <dd
-        className={`font-semibold tracking-tight ${
+        className={`font-semibold tracking-tight text-right ${
           isEmpty && placeholder ? "text-ink-muted/55" : "text-ink"
         }`}
       >

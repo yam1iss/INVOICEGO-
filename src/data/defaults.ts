@@ -1,3 +1,4 @@
+import type { DocumentType } from "./documentTypes";
 import type { Invoice } from "../types/invoice";
 
 function isoDate(date: Date): string {
@@ -13,11 +14,12 @@ function addDays(date: Date, days: number): Date {
   return next;
 }
 
-export function createDefaultInvoice(now = new Date()): Invoice {
+export function createDefaultInvoice(now = new Date(), documentType: DocumentType = "invoice"): Invoice {
   const issue = isoDate(now);
   const due = isoDate(addDays(now, 14));
 
   return {
+    documentType,
     business: {
       name: "",
       email: "",

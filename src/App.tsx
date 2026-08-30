@@ -5,6 +5,7 @@ import { InvoiceEditor } from "./components/InvoiceEditor";
 import { InvoicePreview } from "./components/InvoicePreview";
 import { SiteFooter } from "./components/SiteFooter";
 import { WorkspaceTabs } from "./components/WorkspaceTabs";
+import { getDocumentConfig } from "./data/documentTypes";
 import { useInvoice } from "./hooks/useInvoice";
 import { canDownloadInvoice } from "./utils/invoiceReady";
 import { downloadInvoicePdf } from "./utils/pdf";
@@ -15,12 +16,16 @@ export default function App() {
   const [downloading, setDownloading] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
   const canDownload = canDownloadInvoice(invoiceState.invoice);
+  const docConfig = getDocumentConfig(invoiceState.invoice.documentType);
 
   async function handleDownloadPdf() {
     if (downloading || !canDownload) return;
     setDownloading(true);
     try {
-      await downloadInvoicePdf(invoiceState.invoice.details.invoiceNumber);
+      await downloadInvoicePdf(
+        invoiceState.invoice.details.invoiceNumber,
+        invoiceState.invoice.documentType ?? "invoice",
+      );
     } catch (error) {
       console.error("Could not download invoice PDF.", error);
     } finally {
@@ -39,6 +44,8 @@ export default function App() {
         aria-hidden="true"
       />
       <Header
+        documentType={invoiceState.invoice.documentType ?? "invoice"}
+        onDocumentTypeChange={invoiceState.setDocumentType}
         onNew={() => setConfirmNew(true)}
         onDownloadPdf={handleDownloadPdf}
         downloading={downloading}
@@ -64,12 +71,12 @@ export default function App() {
       <SiteFooter />
       <ConfirmDialog
         open={confirmNew}
-        title="Start a new invoice?"
+        title={`Start a new ${docConfig.label.toLowerCase()}?`}
         description="The current draft will be cleared."
         confirmLabel="Start new"
         onCancel={() => setConfirmNew(false)}
         onConfirm={() => {
-          invoiceState.reset();
+          invoiceState.reset(invoiceState.invoice.documentType);
           setConfirmNew(false);
         }}
       />

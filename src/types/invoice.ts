@@ -1,3 +1,4 @@
+import type { DocumentType } from "../data/documentTypes";
 import type { LineColor, LineTheme } from "../data/lineThemes";
 
 export type CurrencyCode =
@@ -43,6 +44,7 @@ export type InvoiceItem = {
 };
 
 export type Invoice = {
+  documentType?: DocumentType;
   business: BusinessInfo;
   client: ClientInfo;
   details: InvoiceDetails;

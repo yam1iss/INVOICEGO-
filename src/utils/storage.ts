@@ -1,3 +1,4 @@
+import type { DocumentType } from "../data/documentTypes";
 import { migrateLineTheme } from "../data/lineThemes";
 import { createDefaultInvoice } from "../data/defaults";
 import { MOONDEV_WORDMARK } from "../data/logo";
@@ -94,7 +95,13 @@ function normalizeInvoice(
     fallback.details.currency,
   ) as Invoice["details"]["currency"];
 
+  const docType = (typeof parsed.documentType === "string" &&
+    ["invoice", "quotation", "delivery_order"].includes(parsed.documentType)
+    ? parsed.documentType
+    : fallback.documentType ?? "invoice") as DocumentType;
+
   return {
+    documentType: docType,
     business: {
       name: asString(business.name, fallback.business.name),
       email: asString(business.email, fallback.business.email),

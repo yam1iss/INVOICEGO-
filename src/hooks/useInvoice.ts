@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { DocumentType } from "../data/documentTypes";
 import { createDefaultInvoice } from "../data/defaults";
 import type { LineColor, LineTheme } from "../data/lineThemes";
 import type {
@@ -149,9 +150,13 @@ export function useInvoice() {
     setInvoice((current) => ({ ...current, lineColor }));
   }, []);
 
-  const reset = useCallback(() => {
+  const setDocumentType = useCallback((documentType: DocumentType) => {
+    setInvoice((current) => ({ ...current, documentType }));
+  }, []);
+
+  const reset = useCallback((docType?: DocumentType) => {
     clearInvoice();
-    setInvoice(createDefaultInvoice());
+    setInvoice((current) => createDefaultInvoice(new Date(), docType ?? current.documentType ?? "invoice"));
     setFocusItemId(null);
   }, []);
 
@@ -178,6 +183,7 @@ export function useInvoice() {
     setPaymentTerms,
     setLineTheme,
     setLineColor,
+    setDocumentType,
     reset,
   };
 }

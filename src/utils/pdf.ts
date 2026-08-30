@@ -1,5 +1,6 @@
 import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
+import { getDocumentConfig, type DocumentType } from "../data/documentTypes";
 
 const SHEET_WIDTH_PX = 794;
 const SHEET_HEIGHT_PX = Math.round(SHEET_WIDTH_PX * (297 / 210));
@@ -7,7 +8,10 @@ const SHEET_BACKGROUND = "#FFFDF6";
 const FIT_ONE_PAGE_RATIO = 1.45;
 const PAGE_OVERFLOW_MM = 1.5;
 
-export async function downloadInvoicePdf(invoiceNumber: string): Promise<void> {
+export async function downloadInvoicePdf(
+  invoiceNumber: string,
+  documentType: DocumentType = "invoice",
+): Promise<void> {
   const source = document.querySelector<HTMLElement>("[data-invoice-sheet]");
   if (!source) {
     throw new Error("Invoice preview not found.");
@@ -162,21 +166,26 @@ export async function downloadInvoicePdf(invoiceNumber: string): Promise<void> {
       }
     }
 
-    await savePdf(pdf, pdfFileName(invoiceNumber));
+    await savePdf(pdf, pdfFileName(invoiceNumber, documentType));
   } finally {
     overlay.remove();
     host.remove();
   }
 }
 
-export function pdfFileName(invoiceNumber: string): string {
+export function pdfFileName(
+  invoiceNumber: string,
+  documentType: DocumentType = "invoice",
+): string {
+  const config = getDocumentConfig(documentType);
+  const title = config.title;
   const number = invoiceNumber
     .trim()
     .replace(/[\\/:*?"<>|]+/g, "-")
     .replace(/\s+/g, " ");
 
-  if (!number) return "Invoice.pdf";
-  return `Invoice ${number}.pdf`;
+  if (!number) return `${title}.pdf`;
+  return `${title} ${number}.pdf`;
 }
 
 async function savePdf(pdf: jsPDF, filename: string): Promise<void> {
