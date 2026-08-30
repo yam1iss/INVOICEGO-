@@ -8,6 +8,30 @@ const SHEET_BACKGROUND = "#FFFDF6";
 const FIT_ONE_PAGE_RATIO = 1.45;
 const PAGE_OVERFLOW_MM = 1.5;
 
+function getDocumentCss(): string {
+  const cssChunks: string[] = [];
+
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      if (sheet.cssRules) {
+        for (const rule of Array.from(sheet.cssRules)) {
+          cssChunks.push(rule.cssText);
+        }
+      }
+    } catch {
+      // Ignore cross-origin security errors
+    }
+  }
+
+  document.querySelectorAll("style").forEach((styleEl) => {
+    if (styleEl.textContent) {
+      cssChunks.push(styleEl.textContent);
+    }
+  });
+
+  return cssChunks.join("\n");
+}
+
 export async function createInvoicePdf(
   invoiceNumber: string,
   documentType: DocumentType = "invoice",
@@ -52,7 +76,7 @@ export async function createInvoicePdf(
       await document.fonts.ready;
     }
     await waitTwoFrames();
-    await sleep(50);
+    await sleep(60);
 
     const credit = clone.querySelector<HTMLElement>(".mt-auto");
     if (credit) {
@@ -77,12 +101,14 @@ export async function createInvoicePdf(
     const captureHeight = fitsOnePage
       ? SHEET_HEIGHT_PX
       : Math.max(1, Math.ceil(clone.getBoundingClientRect().height));
-    const scale = isMobile() ? 1.5 : 2;
-    const useJpeg = isMobile();
+
+    const scale = 2;
+    const allCss = getDocumentCss();
 
     const canvas = await html2canvas(clone, {
       scale,
       useCORS: true,
+      allowTaint: true,
       backgroundColor: SHEET_BACKGROUND,
       logging: false,
       width: SHEET_WIDTH_PX,
@@ -92,6 +118,24 @@ export async function createInvoicePdf(
       scrollX: 0,
       scrollY: 0,
       onclone: (doc) => {
+        const base = doc.createElement("base");
+        base.href = window.location.origin;
+        doc.head.appendChild(base);
+
+        if (allCss) {
+          const styleEl = doc.createElement("style");
+          styleEl.setAttribute("type", "text/css");
+          styleEl.textContent = allCss;
+          doc.head.appendChild(styleEl);
+        }
+
+        doc.querySelectorAll("link[rel='stylesheet']").forEach((link) => {
+          const href = link.getAttribute("href");
+          if (href && !href.startsWith("http://") && !href.startsWith("https://") && !href.startsWith("//")) {
+            link.setAttribute("href", new URL(href, window.location.href).href);
+          }
+        });
+
         doc.documentElement.style.width = `${SHEET_WIDTH_PX}px`;
         doc.body.style.width = `${SHEET_WIDTH_PX}px`;
         doc.body.style.margin = "0";
@@ -99,10 +143,7 @@ export async function createInvoicePdf(
       },
     });
 
-    const image = useJpeg
-      ? canvas.toDataURL("image/jpeg", 0.92)
-      : canvas.toDataURL("image/png");
-    const imageFormat = useJpeg ? "JPEG" : "PNG";
+    const image = canvas.toDataURL("image/png");
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -122,19 +163,19 @@ export async function createInvoicePdf(
 
     if (imageHeight <= pageHeight + PAGE_OVERFLOW_MM) {
       fillPage();
-      pdf.addImage(image, imageFormat, 0, 0, imageWidth, imageHeight, undefined, "FAST");
+      pdf.addImage(image, "PNG", 0, 0, imageWidth, imageHeight, undefined, "FAST");
     } else if (imageHeight <= pageHeight * FIT_ONE_PAGE_RATIO) {
       const fit = pageHeight / imageHeight;
       const width = imageWidth * fit;
       const x = (pageWidth - width) / 2;
       fillPage();
-      pdf.addImage(image, imageFormat, x, 0, width, pageHeight, undefined, "FAST");
+      pdf.addImage(image, "PNG", x, 0, width, pageHeight, undefined, "FAST");
     } else {
       let remaining = imageHeight;
       let offset = 0;
 
       fillPage();
-      pdf.addImage(image, imageFormat, 0, offset, imageWidth, imageHeight, undefined, "FAST");
+      pdf.addImage(image, "PNG", 0, offset, imageWidth, imageHeight, undefined, "FAST");
       remaining -= pageHeight;
 
       while (remaining > PAGE_OVERFLOW_MM) {
@@ -143,7 +184,7 @@ export async function createInvoicePdf(
         fillPage();
         pdf.addImage(
           image,
-          imageFormat,
+          "PNG",
           0,
           offset,
           imageWidth,
@@ -249,12 +290,16 @@ function sleep(ms: number): Promise<void> {
 function waitForImages(root: HTMLElement): Promise<void> {
   const images = Array.from(root.querySelectorAll("img"));
   return Promise.all(
-    images.map((image) => {
-      if (image.complete) return Promise.resolve();
-      return new Promise<void>((resolve) => {
-        image.addEventListener("load", () => resolve(), { once: true });
-        image.addEventListener("error", () => resolve(), { once: true });
-      });
-    }),
+    images.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete) {
+            resolve();
+            return;
+          }
+          img.addEventListener("load", () => resolve(), { once: true });
+          img.addEventListener("error", () => resolve(), { once: true });
+        }),
+    ),
   ).then(() => undefined);
 }
