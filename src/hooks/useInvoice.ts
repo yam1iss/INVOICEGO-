@@ -105,12 +105,14 @@ export function useInvoice() {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result;
-      if (typeof result === "string") {
+      if (typeof result !== "string") return;
+
+      void resizeLogoDataUrl(result).then((resized) => {
         setInvoice((current) => ({
           ...current,
-          business: { ...current.business, logo: result },
+          business: { ...current.business, logo: resized },
         }));
-      }
+      });
     };
     reader.readAsDataURL(file);
   }, []);
@@ -189,3 +191,45 @@ export function useInvoice() {
 }
 
 export type InvoiceController = ReturnType<typeof useInvoice>;
+
+/** Keep uploaded logos small so iOS PDF capture never paints full-res natural size. */
+const LOGO_RESIZE_MAX_W = 448;
+const LOGO_RESIZE_MAX_H = 112;
+
+function resizeLogoDataUrl(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const { width, height } = img;
+      if (!width || !height) {
+        resolve(dataUrl);
+        return;
+      }
+      const scale = Math.min(
+        LOGO_RESIZE_MAX_W / width,
+        LOGO_RESIZE_MAX_H / height,
+        1,
+      );
+      if (scale >= 1) {
+        resolve(dataUrl);
+        return;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      try {
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}

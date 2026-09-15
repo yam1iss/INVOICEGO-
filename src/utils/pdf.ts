@@ -53,6 +53,8 @@ export async function createInvoicePdf(
 
   try {
     await waitForImages(clone);
+    // iOS paints logos at natural pixel size unless width/height are set explicitly.
+    constrainLogoImages(clone);
     if (document.fonts?.ready) {
       await document.fonts.ready;
     }
@@ -99,8 +101,7 @@ export async function createInvoicePdf(
       windowHeight: captureHeight,
       scrollX: 0,
       scrollY: 0,
-      onclone: (doc) => {
-        // Enforce exact desktop A4 dimensions on the cloned document
+      onclone: (doc, clonedEl) => {
         doc.documentElement.style.width = `${SHEET_WIDTH_PX}px`;
         doc.documentElement.style.minWidth = `${SHEET_WIDTH_PX}px`;
         doc.documentElement.style.maxWidth = `${SHEET_WIDTH_PX}px`;
@@ -111,6 +112,9 @@ export async function createInvoicePdf(
         doc.body.style.margin = "0";
         doc.body.style.padding = "0";
         doc.body.style.background = SHEET_BACKGROUND;
+
+        // Re-apply on the iframe clone — iOS often drops CSS-only image limits.
+        constrainLogoImages(clonedEl);
       },
     });
 
@@ -205,19 +209,23 @@ export function pdfFileName(
 
 async function savePdf(pdf: jsPDF, filename: string): Promise<void> {
   const blob = pdf.output("blob");
-
-  // 1. Mobile Web Share API (Primary on mobile iOS/Android)
   const file = new File([blob], filename, { type: "application/pdf" });
+
+  // Mobile: open the native share sheet with the PDF file only.
+  // Do not pass url/text — that is what produces the blob:… string in WhatsApp.
+  // Do not open a preview tab on iOS after sharing.
   if (isMobile() && canShareFile(file)) {
     try {
-      await navigator.share({ files: [file], title: filename });
+      await navigator.share({ files: [file] });
       return;
     } catch (error) {
+      // User cancelled the share sheet — stop; do not open a preview fallback.
       if (error instanceof Error && error.name === "AbortError") return;
+      // Share failed for another reason — fall through to download below.
     }
   }
 
-  // 2. Standard Blob Link Trigger
+  // Desktop / fallback: trigger a normal file download (no new tab, no blob URL share).
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -226,12 +234,6 @@ async function savePdf(pdf: jsPDF, filename: string): Promise<void> {
   document.body.appendChild(link);
   link.click();
   link.remove();
-
-  // 3. iOS Safari Fallback
-  if (isIOS()) {
-    window.open(url, "_blank");
-  }
-
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
@@ -245,13 +247,6 @@ function canShareFile(file: File): boolean {
 function isMobile(): boolean {
   return (
     window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 768
-  );
-}
-
-function isIOS(): boolean {
-  return (
-    /iP(ad|hone|od)/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
   );
 }
 
@@ -282,4 +277,40 @@ function waitForImages(root: HTMLElement): Promise<void> {
         }),
     ),
   ).then(() => undefined);
+}
+
+/** Max logo box in the A4 PDF clone (matches preview h-14 / max-w-14rem). */
+const LOGO_MAX_HEIGHT_PX = 56;
+const LOGO_MAX_WIDTH_PX = 224;
+
+/**
+ * iOS Safari + html2canvas often ignore CSS max-width/max-height on <img>
+ * and paint at the image's natural pixel size. Set explicit pixel dimensions
+ * via attributes + inline styles so the logo stays header-sized.
+ */
+function constrainLogoImages(root: HTMLElement): void {
+  const images = Array.from(root.querySelectorAll("img"));
+  for (const img of images) {
+    const naturalW = img.naturalWidth || LOGO_MAX_WIDTH_PX;
+    const naturalH = img.naturalHeight || LOGO_MAX_HEIGHT_PX;
+    if (naturalW <= 0 || naturalH <= 0) continue;
+
+    const scale = Math.min(
+      LOGO_MAX_WIDTH_PX / naturalW,
+      LOGO_MAX_HEIGHT_PX / naturalH,
+      1,
+    );
+    const width = Math.max(1, Math.round(naturalW * scale));
+    const height = Math.max(1, Math.round(naturalH * scale));
+
+    img.setAttribute("width", String(width));
+    img.setAttribute("height", String(height));
+    img.style.width = `${width}px`;
+    img.style.height = `${height}px`;
+    img.style.maxWidth = `${LOGO_MAX_WIDTH_PX}px`;
+    img.style.maxHeight = `${LOGO_MAX_HEIGHT_PX}px`;
+    img.style.objectFit = "contain";
+    img.style.display = "block";
+    img.style.flexShrink = "0";
+  }
 }
